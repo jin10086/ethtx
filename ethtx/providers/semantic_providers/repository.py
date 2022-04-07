@@ -41,7 +41,7 @@ class SemanticsRepository:
         etherscan_provider: EtherscanProvider,
         web3provider: NodeDataProvider,
         ens_provider: ENSProvider,
-        refresh_ens: bool = True,
+        refresh_ens: bool = False,
     ):
         self.database = database_connection
         self.etherscan = etherscan_provider
@@ -82,10 +82,7 @@ class SemanticsRepository:
             and address_semantics.name == address_semantics.address
             and not raw_address_semantics["is_contract"]
         ):
-            address_semantics.name = self._ens_provider.name(
-                provider=self._web3provider._get_node_connection(chain_id),
-                address=address,
-            )
+            address_semantics.name = address
 
             if address_semantics.name != address_semantics.address:
                 self.update_semantics(address_semantics)
@@ -169,10 +166,7 @@ class SemanticsRepository:
         else:
             # externally owned address
             contract_semantics = ContractSemantics(code_hash=ZERO_HASH, name="EOA")
-            name = self._ens_provider.name(
-                provider=self._web3provider._get_node_connection(chain_id),
-                address=address,
-            )
+            name = address
             address_semantics = AddressSemantics(
                 chain_id=chain_id,
                 address=address,
