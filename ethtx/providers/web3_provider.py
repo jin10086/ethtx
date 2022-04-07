@@ -24,7 +24,7 @@ from ..exceptions import NodeConnectionException, ProcessingException
 from ..models.objects_model import Transaction, BlockMetadata, TransactionMetadata, Call
 from ..models.semantics_model import FunctionSemantics
 from ..models.w3_model import W3Block, W3Transaction, W3Receipt, W3CallTree, W3Log
-from ..semantics.standards import erc20
+from ..semantics.standards import erc20,pair
 from ..utils.cache_tools import cache
 
 log = logging.getLogger(__name__)
@@ -94,6 +94,9 @@ class NodeDataProvider:
         ...
 
     def guess_erc20_token(self, contract_address: str, chain_id: Optional[str] = None):
+        ...
+        
+    def guess_pair_contract(self, contract_address: str, chain_id: Optional[str] = None):
         ...
 
     def guess_erc20_proxy(self, contract_address: str, chain_id: Optional[str] = None):
@@ -379,6 +382,61 @@ class Web3Provider(NodeDataProvider):
                 name = token.functions.name().call()
                 symbol = token.functions.symbol().call()
                 decimals = token.functions.decimals().call()
+
+                return dict(
+                    address=contract_address,
+                    symbol=symbol,
+                    name=name,
+                    decimals=decimals,
+                )
+
+            except Exception:
+                pass
+
+        return None
+    # guess if the contract is and pair and get the data
+    @cache
+    def guess_pair_contract(self, contract_address, chain_id: Optional[str] = None):
+        chain = self._get_node_connection(chain_id)
+
+        byte_code = chain.eth.get_code(
+            Web3.toChecksumAddress(contract_address[-40:])
+        ).hex()
+
+        if all(
+            "63" + signature[2:] in byte_code
+            for signature in (
+                pair.pair_swap_function.signature,
+            )
+        ) and all(
+            signature[2:] in byte_code
+            for signature in (
+                pair.pair_sync_event.signature,
+            )
+        ):
+
+            name_abi = (
+                '{"name":"name", "constant":true, "payable":false,'
+                ' "type":"function", "inputs":[], "outputs":[{"name":"","type":"string"}]}'
+            )
+            # symbol_abi = (
+            #     '{"name":"symbol", "constant":true, "payable":false,'
+            #     '"type":"function", "inputs":[], "outputs":[{"name":"","type":"string"}]}'
+            # )
+            # decimals_abi = (
+            #     '{"name":"decimals", "constant":true, "payable":false,'
+            #     '"type":"function",  "inputs":[], "outputs":[{"name":"","type":"uint8"}]}'
+            # )
+
+            abi = f'[{",".join([name_abi])}]'
+
+            try:
+                token = chain.eth.contract(
+                    address=Web3.toChecksumAddress(contract_address), abi=abi
+                )
+                name = token.functions.name().call()
+                symbol = name
+                decimals = 18
 
                 return dict(
                     address=contract_address,

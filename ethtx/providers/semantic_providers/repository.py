@@ -31,6 +31,7 @@ from ethtx.semantics.protocols_router import amend_contract_semantics
 from ethtx.semantics.solidity.precompiles import precompiles
 from ethtx.semantics.standards.erc20 import ERC20_FUNCTIONS, ERC20_EVENTS
 from ethtx.semantics.standards.erc721 import ERC721_FUNCTIONS, ERC721_EVENTS
+from ethtx.semantics.standards.pairabi import PAIR_EVENT, PAIR_FUNCTION
 from ethtx.utils.cache_tools import cache
 
 
@@ -99,69 +100,125 @@ class SemanticsRepository:
         code_hash = provider.get_code_hash(address, chain_id)
 
         if code_hash != ZERO_HASH:
-            # smart contract
-            raw_semantics, decoded = self.etherscan.contract.get_contract_abi(
-                chain_id, address
+            
+            print('gaojin...pair check...')
+
+            # check pair contract,check erc20 contract and other
+            potential_pair_semantics = provider.guess_pair_contract(
+                    address, chain_id
             )
-            if decoded and raw_semantics:
-                # raw semantics received from Etherscan
-                events, functions = decode_events_and_functions(raw_semantics["abi"])
-                standard, standard_semantics = self._decode_standard_semantics(
-                    address, raw_semantics["name"], events, functions
+            if potential_pair_semantics:
+                standard = "PAIR"
+                erc20_semantics = ERC20Semantics(
+                    name=potential_pair_semantics["name"],
+                    symbol=potential_pair_semantics["symbol"],
+                    decimals=potential_pair_semantics["decimals"],
                 )
-                if standard == "ERC20":
-                    erc20_semantics = standard_semantics
-                else:
-                    proxy_erc20 = provider.guess_erc20_proxy(address, chain_id)
-                    if proxy_erc20:
-                        erc20_semantics = ERC20Semantics(**proxy_erc20)
-                    else:
-                        erc20_semantics = None
                 contract_semantics = ContractSemantics(
                     code_hash=code_hash,
-                    name=raw_semantics["name"],
-                    events=events,
-                    functions=functions,
+                    name=potential_pair_semantics["name"],
+                    events=PAIR_EVENT,
+                    functions=PAIR_FUNCTION,
                     transformations={},
                 )
-                address_semantics = AddressSemantics(
-                    chain_id=chain_id,
-                    address=address,
-                    name=raw_semantics["name"],
-                    is_contract=True,
-                    contract=contract_semantics,
-                    standard=standard,
-                    erc20=erc20_semantics,
-                )
 
-            else:
-                # try to guess if the address is a toke
+            elif provider.guess_erc20_token(
+                    address, chain_id
+                ):
                 potential_erc20_semantics = provider.guess_erc20_token(
                     address, chain_id
                 )
-                if potential_erc20_semantics:
-                    standard = "ERC20"
-                    erc20_semantics = ERC20Semantics(
-                        name=potential_erc20_semantics["name"],
-                        symbol=potential_erc20_semantics["symbol"],
-                        decimals=potential_erc20_semantics["decimals"],
-                    )
-                else:
-                    standard = None
-                    erc20_semantics = None
+                standard = "ERC20"
+                erc20_semantics = ERC20Semantics(
+                    name=potential_erc20_semantics["name"],
+                    symbol=potential_erc20_semantics["symbol"],
+                    decimals=potential_erc20_semantics["decimals"],
+                )
+                contract_semantics = ContractSemantics(
+                    code_hash=code_hash, name=address
+                )
+            else:
+                standard = None
+                erc20_semantics = None
 
                 contract_semantics = ContractSemantics(
                     code_hash=code_hash, name=address
                 )
-                address_semantics = AddressSemantics(
-                    chain_id=chain_id,
-                    address=address,
-                    name=address,
-                    is_contract=True,
-                    contract=contract_semantics,
-                    standard=standard,
-                    erc20=erc20_semantics,
-                )
+            address_semantics = AddressSemantics(
+                chain_id=chain_id,
+                address=address,
+                name=address,
+                is_contract=True,
+                contract=contract_semantics,
+                standard=standard,
+                erc20=erc20_semantics,
+            )
+
+
+
+            # # smart contract
+            # raw_semantics, decoded = self.etherscan.contract.get_contract_abi(
+            #     chain_id, address
+            # )
+            # if decoded and raw_semantics:
+            #     # raw semantics received from Etherscan
+            #     events, functions = decode_events_and_functions(raw_semantics["abi"])
+            #     standard, standard_semantics = self._decode_standard_semantics(
+            #         address, raw_semantics["name"], events, functions
+            #     )
+            #     if standard == "ERC20":
+            #         erc20_semantics = standard_semantics
+            #     else:
+            #         proxy_erc20 = provider.guess_erc20_proxy(address, chain_id)
+            #         if proxy_erc20:
+            #             erc20_semantics = ERC20Semantics(**proxy_erc20)
+            #         else:
+            #             erc20_semantics = None
+            #     contract_semantics = ContractSemantics(
+            #         code_hash=code_hash,
+            #         name=raw_semantics["name"],
+            #         events=events,
+            #         functions=functions,
+            #         transformations={},
+            #     )
+            #     address_semantics = AddressSemantics(
+            #         chain_id=chain_id,
+            #         address=address,
+            #         name=raw_semantics["name"],
+            #         is_contract=True,
+            #         contract=contract_semantics,
+            #         standard=standard,
+            #         erc20=erc20_semantics,
+            #     )
+
+            # else:
+            #     # try to guess if the address is a toke
+            #     potential_erc20_semantics = provider.guess_erc20_token(
+            #         address, chain_id
+            #     )
+            #     if potential_erc20_semantics:
+            #         standard = "ERC20"
+            #         erc20_semantics = ERC20Semantics(
+            #             name=potential_erc20_semantics["name"],
+            #             symbol=potential_erc20_semantics["symbol"],
+            #             decimals=potential_erc20_semantics["decimals"],
+            #         )
+            #     else:
+            #         standard = None
+            #         erc20_semantics = None
+
+            #     contract_semantics = ContractSemantics(
+            #         code_hash=code_hash, name=address
+            #     )
+            #     address_semantics = AddressSemantics(
+            #         chain_id=chain_id,
+            #         address=address,
+            #         name=address,
+            #         is_contract=True,
+            #         contract=contract_semantics,
+            #         standard=standard,
+            #         erc20=erc20_semantics,
+            #     )
 
         else:
             # externally owned address
