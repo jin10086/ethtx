@@ -101,7 +101,6 @@ class SemanticsRepository:
 
         if code_hash != ZERO_HASH:
             
-            print('gaojin...pair check...')
 
             # check pair contract,check erc20 contract and other
             potential_pair_semantics = provider.guess_pair_contract(

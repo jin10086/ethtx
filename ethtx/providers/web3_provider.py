@@ -542,7 +542,7 @@ class Web3Provider(NodeDataProvider):
             calls = dct.pop("calls", [])
             return dct, calls
 
-        obj = input_rpc.__dict__
+        obj = input_rpc
         tmp_call_tree = []
 
         w3input, main_parent_calls = prep_raw_dict(obj)
